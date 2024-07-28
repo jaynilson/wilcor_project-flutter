@@ -1,5 +1,6 @@
 import 'dart:convert';
-
+// import 'dart:html';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wilcoerp/constants/globals.dart';
 import 'package:wilcoerp/helpers/helpers.dart';
 import 'package:wilcoerp/models/asset.dart';
@@ -51,18 +52,29 @@ class WebService {
     }
   }
 
-  Future<UserModel> signIn(String pin) async {
+  Future<UserModel> signIn(String email, String password) async {
     dio.options.headers["Content-type"] = "application/json";
     dio.options.headers["Accept"] = "application/json";
-    String baseURL = apiUrl + "login_pin";
+    String baseURL =
+        apiUrl + "login"; // Ensure this matches your backend endpoint
 
     try {
-      dynamic response =
-          await dio.post(baseURL, data: jsonEncode({"pin": pin}));
+      dynamic response = await dio.post(
+        baseURL,
+        data: jsonEncode({
+          "email": email,
+          "password": password,
+        }),
+      );
 
       if (response.statusCode == 200) {
         dynamic userJson = response.data["user"];
         userJson["token"] = response.data["access_token"];
+        userJson["loginTimestamp"] = DateTime.now().millisecondsSinceEpoch;
+
+        // Store the login timestamp
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('loginTimestamp', userJson["loginTimestamp"]);
 
         return UserModel.fromJson(userJson);
       } else {
@@ -71,12 +83,24 @@ class WebService {
     } catch (e) {
       print("error signIn");
       print(e);
-
-      if (e is DioError)
+      if (e is DioError) {
         return Future.error(checkErrors((e as DioError).response));
-
-      return Future.error(['Ocurrió un error desconocido, intenté de nuevo.']);
+      }
+      return Future.error(['An unknown error occurred, please try again.']);
     }
+  }
+
+  Future<bool> isLoginExpired() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    int? loginTimestamp = prefs.getInt('loginTimestamp');
+    if (loginTimestamp == null) return true;
+
+    int currentTimestamp = DateTime.now().millisecondsSinceEpoch;
+
+    // Set the expiration time (e.g., 24 hours)
+    int expirationTime = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+    return (currentTimestamp - loginTimestamp) > expirationTime;
   }
 
   Future<bool> resendPin(String email) async {
