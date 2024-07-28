@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_page_transition/flutter_page_transition.dart';
 import 'package:progress_indicators/progress_indicators.dart';
 import 'package:provider/provider.dart';
+import 'package:wilcoerp/services/web_service.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({Key? key}) : super(key: key);
@@ -49,42 +50,51 @@ class _SplashPageState extends State<SplashPage> {
       try {
         UserModel user = await AppPreferences().getUser();
 
-        try {
-          if (user.id == null) {
-            Navigator.pushAndRemoveUntil(
-                context,
-                PageTransition(
-                    child: LoginPage(),
-                    type: PageTransitionType.slideInUp,
-                    duration: Duration(milliseconds: 250)),
-                (Route<dynamic> route) => false);
-          } else {
-            await provider.setUser(user);
+        if (user.id == null) {
+          _navigateToLogin();
+        } else {
+          await provider.setUser(user);
 
+          bool isExpired = await WebService(context).isLoginExpired();
+
+          if (isExpired) {
+            _navigateToLogin();
+          } else {
             initProcess(context, user, () {
-              Navigator.pushAndRemoveUntil(
-                  context,
-                  PageTransition(
-                      child: HomePage(),
-                      type: PageTransitionType.slideInUp,
-                      duration: Duration(milliseconds: 250)),
-                  (Route<dynamic> route) => false);
+              _navigateToHome();
             });
           }
-        } catch (e) {
-          Navigator.pushAndRemoveUntil(
-              context,
-              PageTransition(
-                  child: LoginPage(),
-                  type: PageTransitionType.slideInUp,
-                  duration: Duration(milliseconds: 250)),
-              (Route<dynamic> route) => false);
         }
       } catch (e) {
-        print("error al cargar");
+        print("Error loading user data");
         print(e);
+        _navigateToLogin();
       }
     });
+  }
+
+  void _navigateToLogin() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      PageTransition(
+        child: LoginPage(),
+        type: PageTransitionType.slideInUp,
+        duration: Duration(milliseconds: 250),
+      ),
+      (Route<dynamic> route) => false,
+    );
+  }
+
+  void _navigateToHome() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      PageTransition(
+        child: HomePage(),
+        type: PageTransitionType.slideInUp,
+        duration: Duration(milliseconds: 250),
+      ),
+      (Route<dynamic> route) => false,
+    );
   }
 
   @override
